@@ -6,15 +6,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Description;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 
 @Service
-public final class TrainService {
+@Description("Retrieves train arrivals for the specified station ID")
+public final class TrainService implements Function<Request, Response> {
     private final String cta4jUrl;
 
     private static final Logger LOGGER;
@@ -54,10 +57,13 @@ public final class TrainService {
         }""".formatted(stationId, query);
     }
 
-    public List<Train> getTrains(int stationId) {
+    @Override
+    public Response apply(Request request) {
         RestClient client = RestClient.builder()
                                       .baseUrl(this.cta4jUrl)
                                       .build();
+
+        int stationId = request.stationId();
 
         String payload = this.getPayload(stationId);
 
@@ -71,12 +77,16 @@ public final class TrainService {
         if (response == null) {
             TrainService.LOGGER.error("Failed to retrieve trains from cta4j API");
 
-            return List.of();
+            List<Train> trains = List.of();
+
+            return new Response(trains);
         }
 
         List<Train> trains = response.body()
                                      .trains();
 
-        return List.copyOf(trains);
+        trains = List.copyOf(trains);
+
+        return new Response(trains);
     }
 }
