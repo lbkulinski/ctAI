@@ -4,3 +4,5 @@ spring:
   ai:
     openai:
       api-key: ${OPENAI_API_KEY}
+cta4j:
+  api-url: ${CTA4J_API_URL}
