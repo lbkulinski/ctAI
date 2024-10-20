@@ -1,6 +1,6 @@
 package net.lbku.service;
 
-import net.lbku.model.Train;
+import net.lbku.client.model.Train;
 
 import java.util.List;
 import java.util.Objects;

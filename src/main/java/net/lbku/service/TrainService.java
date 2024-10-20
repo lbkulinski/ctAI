@@ -1,7 +1,8 @@
 package net.lbku.service;
 
-import net.lbku.model.Train;
-import net.lbku.model.TrainResponse;
+import net.lbku.client.api.StationApi;
+import net.lbku.client.invoker.ApiException;
+import net.lbku.client.model.Train;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +19,7 @@ import java.util.function.Function;
 @Service
 @Description("Retrieves train arrivals for the specified station ID")
 public final class TrainService implements Function<Request, Response> {
-    private final String cta4jUrl;
+    private final StationApi stationApi;
 
     private static final Logger LOGGER;
 
@@ -27,65 +28,21 @@ public final class TrainService implements Function<Request, Response> {
     }
 
     @Autowired
-    public TrainService(@Value("${cta4j.api-url}") String cta4jUrl) {
-        this.cta4jUrl = Objects.requireNonNull(cta4jUrl);
-    }
-
-    private String getPayload(int stationId) {
-        String query = """
-        query Trains($stationId: ID!) { \
-          trains(stationId: $stationId) { \
-            line \
-            destination \
-            run \
-            predictionTime \
-            arrivalTime \
-            due \
-            scheduled \
-            delayed \
-            __typename \
-          } \
-        }""";
-
-        return """
-        {
-          "operationName": "Trains",
-          "variables": {
-            "stationId": "%d"
-          },
-          "query": "%s"
-        }""".formatted(stationId, query);
+    public TrainService(StationApi stationApi) {
+        this.stationApi = Objects.requireNonNull(stationApi);
     }
 
     @Override
     public Response apply(Request request) {
-        RestClient client = RestClient.builder()
-                                      .baseUrl(this.cta4jUrl)
-                                      .build();
-
         int stationId = request.stationId();
 
-        String payload = this.getPayload(stationId);
+        List<Train> trains;
 
-        TrainResponse response = client.post()
-                                       .uri("/graphql")
-                                       .body(payload)
-                                       .contentType(MediaType.APPLICATION_JSON)
-                                       .retrieve()
-                                       .body(TrainResponse.class);
-
-        if (response == null) {
-            TrainService.LOGGER.error("Failed to retrieve trains from cta4j API");
-
-            List<Train> trains = List.of();
-
-            return new Response(trains);
+        try {
+            trains = this.stationApi.getArrivals(stationId);
+        } catch (ApiException e) {
+            throw new RuntimeException(e);
         }
-
-        List<Train> trains = response.body()
-                                     .trains();
-
-        trains = List.copyOf(trains);
 
         return new Response(trains);
     }
